@@ -18,4 +18,8 @@
 
 const std = @import("std");
 
+const c = @cImport({
+    @cInclude("llama.h");
+});
+
 pub fn main() !void {}

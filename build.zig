@@ -46,6 +46,9 @@ pub fn build(b: *std.Build) void {
     exe.want_lto = optimize != .Debug;
     exe.compress_debug_sections = .zlib;
 
+    exe.linkLibC();
+    exe.linkSystemLibrary("llama");
+
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
@@ -66,6 +69,8 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_unit_tests.step);
 
     const exe_check = b.addExecutable(exe_opts);
+    exe_check.linkLibC();
+    exe_check.linkSystemLibrary("llama");
     const check_step = b.step("check", "Check if app compiles");
     check_step.dependOn(&exe_check.step);
 }
