@@ -16,32 +16,30 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-pub const std_options = .{
-    .log_level = .info,
-    .logFn = @import("log.zig").logImpl,
-};
-
 const std = @import("std");
-const log = std.log;
-const c = @cImport({
-    @cInclude("llama.h");
-});
 
-pub fn main() !void {
-    c.llama_log_set(llamaLog, null);
-}
+pub fn logImpl(
+    comptime level: std.log.Level,
+    comptime scope: @TypeOf(.EnumLiteral),
+    comptime format: []const u8,
+    args: anytype,
+) void {
+    const prefix = switch (level) {
+        .err => "\x1B[1;31mE",
+        .warn => "\x1B[1;33mW",
+        .info => "\x1B[0;32mI",
+        .debug => "\x1B[0;34mD",
+    };
+    const tag = if (scope == .default) "" else "[" ++ @tagName(scope) ++ "]";
+    const fmt_str = prefix ++ tag ++ " " ++ format ++ "\x1B[0m\n";
 
-fn llamaLog(
-    level: c.ggml_log_level,
-    text: [*c]const u8,
-    user_data: ?*anyopaque,
-) callconv(.C) void {
-    _ = user_data;
-    switch (level) {
-        c.GGML_LOG_LEVEL_ERROR => log.err("{s}", .{text}),
-        c.GGML_LOG_LEVEL_WARN => log.warn("{s}", .{text}),
-        c.GGML_LOG_LEVEL_INFO => log.info("{s}", .{text}),
-        c.GGML_LOG_LEVEL_DEBUG => log.debug("{s}", .{text}),
-        else => unreachable,
-    }
+    const stderr = std.io.getStdErr().writer();
+    var bw = std.io.bufferedWriter(stderr);
+    const writer = bw.writer();
+
+    std.debug.lockStdErr();
+    defer std.debug.unlockStdErr();
+
+    writer.print(fmt_str, args) catch return;
+    bw.flush() catch return;
 }
