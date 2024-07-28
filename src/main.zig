@@ -17,9 +17,41 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 const std = @import("std");
-
+const log = std.log;
+const bread_lib = @import("bread-lib");
 const c = @cImport({
     @cInclude("llama.h");
 });
 
-pub fn main() !void {}
+pub const std_options = .{
+    .log_level = .info,
+    .logFn = bread_lib.log.logFn,
+};
+
+pub fn main() !void {
+    c.llama_log_set(llamaLog, null);
+}
+
+fn llamaLog(
+    level: c.ggml_log_level,
+    text: [*c]const u8,
+    user_data: ?*anyopaque,
+) callconv(.C) void {
+    const llama_log = std.log.scoped(.@"llama.cpp");
+    _ = user_data;
+
+    var str: []const u8 = std.mem.span(text);
+    if ((str.len > 0) and (str[str.len - 1] == '\n')) {
+        str.len -= 1;
+    }
+
+    switch (level) {
+        c.GGML_LOG_LEVEL_NONE => {},
+        c.GGML_LOG_LEVEL_CONT => {},
+        c.GGML_LOG_LEVEL_DEBUG => llama_log.debug("{s}", .{str}),
+        c.GGML_LOG_LEVEL_INFO => llama_log.info("{s}", .{str}),
+        c.GGML_LOG_LEVEL_WARN => llama_log.warn("{s}", .{str}),
+        c.GGML_LOG_LEVEL_ERROR => llama_log.err("{s}", .{str}),
+        else => unreachable,
+    }
+}

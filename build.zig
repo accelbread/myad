@@ -40,7 +40,10 @@ pub fn build(b: *std.Build) void {
         .strip = optimize != .Debug,
     };
 
+    const bread_lib = b.dependency("bread-lib", .{}).module("bread-lib");
+
     const exe = b.addExecutable(exe_opts);
+    exe.root_module.addImport("bread-lib", bread_lib);
 
     exe.pie = true;
     exe.want_lto = optimize != .Debug;
@@ -69,6 +72,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_unit_tests.step);
 
     const exe_check = b.addExecutable(exe_opts);
+    exe_check.root_module.addImport("bread-lib", bread_lib);
     exe_check.linkLibC();
     exe_check.linkSystemLibrary("llama");
     const check_step = b.step("check", "Check if app compiles");
