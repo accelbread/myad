@@ -18,9 +18,11 @@
 
 const std = @import("std");
 const log = std.log;
+const assert = std.debug.assert;
 const bread_lib = @import("bread-lib");
 const c = @cImport({
     @cInclude("llama.h");
+    @cInclude("ggml.h");
 });
 
 pub const std_options = .{
@@ -28,8 +30,50 @@ pub const std_options = .{
     .logFn = bread_lib.log.logFn,
 };
 
-pub fn main() !void {
+pub fn main() !u8 {
     c.llama_log_set(llamaLog, null);
+
+    c.llama_backend_init();
+    defer c.llama_backend_free();
+
+    assert(c.llama_supports_gpu_offload());
+    assert(c.llama_max_devices() <= 32);
+
+    var mparams = c.llama_model_default_params();
+    mparams.n_gpu_layers = 100;
+
+    const model: *c.llama_model = c.llama_load_model_from_file(
+        "/persist/cache/models/dolphin-2.7-mixtral-8x7b-q5_k_m.gguf",
+        mparams,
+    ) orelse return 1;
+    defer c.llama_free_model(model);
+
+    var lparams = c.llama_context_default_params();
+    lparams.n_ctx = 0;
+    lparams.n_threads = 32;
+
+    const lctx: *c.llama_context =
+        c.llama_new_context_with_model(model, lparams) orelse return 1;
+    defer c.llama_free(lctx);
+
+    const template_test: c.llama_chat_message = .{
+        .role = "user",
+        .content = "test",
+    };
+
+    assert(c.llama_chat_apply_template(
+        model,
+        null,
+        &template_test,
+        1,
+        true,
+        null,
+        0,
+    ) > 0);
+
+    std.time.sleep(2000);
+
+    return 0;
 }
 
 fn llamaLog(
